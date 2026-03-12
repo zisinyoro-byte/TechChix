@@ -15,9 +15,17 @@ export async function GET() {
     // Continue with existing data fetch...
     const activeFlocks = await db.flock.findMany({
       where: { status: "ACTIVE" },
-      select: { currentCount: true, batchNumber: true },
+      select: { 
+        id: true,
+        currentCount: true, 
+        batchNumber: true,
+        breed: true,
+        initialCount: true,
+        startDate: true,
+        status: true,
+      },
     })
-    const totalBirds = activeFlocks.reduce((sum, flock) => sum + flock.currentCount, 00)
+    const totalBirds = activeFlocks.reduce((sum, flock) => sum + flock.currentCount, 0)
 
     // Get feed inventory
     const feeds = await db.feed.findMany({
@@ -243,10 +251,5 @@ export async function GET() {
       { error: "Failed to fetch dashboard data" },
       { status: 500 }
     )
-  }
- finally {
-  if (error) {
-    console.error("Dashboard API error finally:", error)
-    return NextResponse.json({ error: "Failed to fetch dashboard data" })
   }
 }
