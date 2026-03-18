@@ -111,6 +111,14 @@ interface House {
   occupancyRate: number
 }
 
+interface Feed {
+  id: string
+  name: string
+  type: string
+  quantity: number
+  unitCost: number
+}
+
 // Color palette
 const COLORS = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"]
 
@@ -127,11 +135,13 @@ export default function TechChixDashboard() {
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [flocks, setFlocks] = useState<Flock[]>([])
   const [houses, setHouses] = useState<House[]>([])
+  const [feeds, setFeeds] = useState<Feed[]>([])
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [activeTab, setActiveTab] = useState("dashboard")
   const [showNewFlockDialog, setShowNewFlockDialog] = useState(false)
   const [showNewRecordDialog, setShowNewRecordDialog] = useState(false)
+  const [showFeedDialog, setShowFeedDialog] = useState(false)
   const { toast } = useToast()
 
   // Form states
@@ -152,6 +162,14 @@ export default function TechChixDashboard() {
     feedConsumed: 0,
     waterConsumed: 0,
     avgWeight: 0,
+    notes: "",
+  })
+
+  const [newFeedDistribution, setNewFeedDistribution] = useState({
+    feedId: "",
+    flockId: "",
+    quantity: 0,
+    distributedBy: "",
     notes: "",
   })
 
@@ -187,6 +205,18 @@ export default function TechChixDashboard() {
       setHouses(data)
     } catch (error) {
       console.error("Error fetching houses:", error)
+    }
+  }
+
+  // Fetch feeds
+  const fetchFeeds = async () => {
+    try {
+      const res = await fetch("/api/feed")
+      if (!res.ok) throw new Error("Failed to fetch")
+      const data = await res.json()
+      setFeeds(data)
+    } catch (error) {
+      console.error("Error fetching feeds:", error)
     }
   }
 
@@ -276,9 +306,46 @@ export default function TechChixDashboard() {
     }
   }
 
+  // Create feed distribution
+  const createFeedDistribution = async () => {
+    try {
+      const res = await fetch("/api/feed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "distribute",
+          ...newFeedDistribution,
+          distributedAt: new Date().toISOString(),
+        }),
+      })
+      if (!res.ok) throw new Error("Failed to create")
+      toast({
+        title: "Success",
+        description: "Feed distribution recorded successfully",
+      })
+      setShowFeedDialog(false)
+      setNewFeedDistribution({
+        feedId: "",
+        flockId: "",
+        quantity: 0,
+        distributedBy: "",
+        notes: "",
+      })
+      fetchDashboard()
+      fetchFeeds()
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to record feed distribution",
+        variant: "destructive",
+      })
+    }
+  }
+
   useEffect(() => {
     fetchDashboard()
     fetchHouses()
+    fetchFeeds()
   }, [])
 
   const menuItems = [
@@ -845,13 +912,92 @@ export default function TechChixDashboard() {
                           </DialogContent>
                         </Dialog>
 
-                        <Button
-                          variant="outline"
-                          className="h-20 flex-col gap-2 border-slate-600 hover:bg-slate-700 hover:border-blue-500"
-                        >
-                          <Wheat className="w-5 h-5 text-blue-500" />
-                          <span className="text-slate-300">Record Feed</span>
-                        </Button>
+                        <Dialog open={showFeedDialog} onOpenChange={setShowFeedDialog}>
+                          <DialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="h-20 flex-col gap-2 border-slate-600 hover:bg-slate-700 hover:border-blue-500"
+                            >
+                              <Wheat className="w-5 h-5 text-blue-500" />
+                              <span className="text-slate-300">Record Feed</span>
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="bg-slate-800 border-slate-700">
+                            <DialogHeader>
+                              <DialogTitle className="text-white">Record Feed Distribution</DialogTitle>
+                              <DialogDescription className="text-slate-400">
+                                Distribute feed to a flock.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 pt-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label className="text-slate-300">Feed Type</Label>
+                                  <Select value={newFeedDistribution.feedId} onValueChange={(value) => setNewFeedDistribution({ ...newFeedDistribution, feedId: value })}>
+                                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                                      <SelectValue placeholder="Select feed" />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-slate-700 border-slate-600">
+                                      {feeds.map((feed) => (
+                                        <SelectItem key={feed.id} value={feed.id} className="text-white">
+                                          {feed.name} ({feed.quantity} kg)
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div>
+                                  <Label className="text-slate-300">Flock</Label>
+                                  <Select value={newFeedDistribution.flockId} onValueChange={(value) => setNewFeedDistribution({ ...newFeedDistribution, flockId: value })}>
+                                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                                      <SelectValue placeholder="Select flock" />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-slate-700 border-slate-600">
+                                      {flocks.map((flock) => (
+                                        <SelectItem key={flock.id} value={flock.id} className="text-white">
+                                          {flock.batchNumber}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label className="text-slate-300">Quantity (kg)</Label>
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    value={newFeedDistribution.quantity}
+                                    onChange={(e) => setNewFeedDistribution({ ...newFeedDistribution, quantity: parseFloat(e.target.value) || 0 })}
+                                    className="bg-slate-700 border-slate-600 text-white"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-slate-300">Distributed By</Label>
+                                  <Input
+                                    placeholder="Worker name"
+                                    value={newFeedDistribution.distributedBy}
+                                    onChange={(e) => setNewFeedDistribution({ ...newFeedDistribution, distributedBy: e.target.value })}
+                                    className="bg-slate-700 border-slate-600 text-white"
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <Label className="text-slate-300">Notes</Label>
+                                <Textarea
+                                  placeholder="Optional notes..."
+                                  value={newFeedDistribution.notes}
+                                  onChange={(e) => setNewFeedDistribution({ ...newFeedDistribution, notes: e.target.value })}
+                                  className="bg-slate-700 border-slate-600 text-white"
+                                />
+                              </div>
+                              <Button onClick={createFeedDistribution} className="w-full bg-gradient-to-r from-blue-600 to-cyan-600">
+                                Record Distribution
+                              </Button>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
 
                         <Button
                           variant="outline"
