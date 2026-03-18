@@ -119,6 +119,14 @@ interface Feed {
   unitCost: number
 }
 
+interface Medicine {
+  id: string
+  name: string
+  type: string
+  quantity: number
+  unit: string
+}
+
 // Color palette
 const COLORS = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"]
 
@@ -136,12 +144,15 @@ export default function TechChixDashboard() {
   const [flocks, setFlocks] = useState<Flock[]>([])
   const [houses, setHouses] = useState<House[]>([])
   const [feeds, setFeeds] = useState<Feed[]>([])
+  const [medicines, setMedicines] = useState<Medicine[]>([])
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [activeTab, setActiveTab] = useState("dashboard")
   const [showNewFlockDialog, setShowNewFlockDialog] = useState(false)
   const [showNewRecordDialog, setShowNewRecordDialog] = useState(false)
   const [showFeedDialog, setShowFeedDialog] = useState(false)
+  const [showVaccinationDialog, setShowVaccinationDialog] = useState(false)
+  const [showTransactionDialog, setShowTransactionDialog] = useState(false)
   const { toast } = useToast()
 
   // Form states
@@ -171,6 +182,25 @@ export default function TechChixDashboard() {
     quantity: 0,
     distributedBy: "",
     notes: "",
+  })
+
+  const [newVaccination, setNewVaccination] = useState({
+    flockId: "",
+    medicineId: "",
+    vaccinationDate: new Date().toISOString().split("T")[0],
+    dosage: 1,
+    administeredBy: "",
+    method: "",
+    notes: "",
+  })
+
+  const [newTransaction, setNewTransaction] = useState({
+    type: "EXPENSE",
+    category: "",
+    amount: 0,
+    date: new Date().toISOString().split("T")[0],
+    description: "",
+    flockId: "",
   })
 
   // Fetch dashboard data
@@ -217,6 +247,18 @@ export default function TechChixDashboard() {
       setFeeds(data)
     } catch (error) {
       console.error("Error fetching feeds:", error)
+    }
+  }
+
+  // Fetch medicines
+  const fetchMedicines = async () => {
+    try {
+      const res = await fetch("/api/health")
+      if (!res.ok) throw new Error("Failed to fetch")
+      const data = await res.json()
+      setMedicines(data)
+    } catch (error) {
+      console.error("Error fetching medicines:", error)
     }
   }
 
@@ -342,10 +384,83 @@ export default function TechChixDashboard() {
     }
   }
 
+  // Create vaccination
+  const createVaccination = async () => {
+    try {
+      const res = await fetch("/api/health", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recordType: "vaccination",
+          ...newVaccination,
+          vaccinationDate: new Date(newVaccination.vaccinationDate).toISOString(),
+        }),
+      })
+      if (!res.ok) throw new Error("Failed to create")
+      toast({
+        title: "Success",
+        description: "Vaccination recorded successfully",
+      })
+      setShowVaccinationDialog(false)
+      setNewVaccination({
+        flockId: "",
+        medicineId: "",
+        vaccinationDate: new Date().toISOString().split("T")[0],
+        dosage: 1,
+        administeredBy: "",
+        method: "",
+        notes: "",
+      })
+      fetchDashboard()
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to record vaccination",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Create transaction
+  const createTransaction = async () => {
+    try {
+      const res = await fetch("/api/financial", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...newTransaction,
+          date: new Date(newTransaction.date).toISOString(),
+        }),
+      })
+      if (!res.ok) throw new Error("Failed to create")
+      toast({
+        title: "Success",
+        description: "Transaction recorded successfully",
+      })
+      setShowTransactionDialog(false)
+      setNewTransaction({
+        type: "EXPENSE",
+        category: "",
+        amount: 0,
+        date: new Date().toISOString().split("T")[0],
+        description: "",
+        flockId: "",
+      })
+      fetchDashboard()
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to record transaction",
+        variant: "destructive",
+      })
+    }
+  }
+
   useEffect(() => {
     fetchDashboard()
     fetchHouses()
     fetchFeeds()
+    fetchMedicines()
   }, [])
 
   const menuItems = [
@@ -999,21 +1114,186 @@ export default function TechChixDashboard() {
                           </DialogContent>
                         </Dialog>
 
-                        <Button
-                          variant="outline"
-                          className="h-20 flex-col gap-2 border-slate-600 hover:bg-slate-700 hover:border-purple-500"
-                        >
-                          <HeartPulse className="w-5 h-5 text-purple-500" />
-                          <span className="text-slate-300">Add Vaccination</span>
-                        </Button>
+                        <Dialog open={showVaccinationDialog} onOpenChange={setShowVaccinationDialog}>
+                          <DialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="h-20 flex-col gap-2 border-slate-600 hover:bg-slate-700 hover:border-purple-500"
+                            >
+                              <HeartPulse className="w-5 h-5 text-purple-500" />
+                              <span className="text-slate-300">Add Vaccination</span>
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="bg-slate-800 border-slate-700">
+                            <DialogHeader>
+                              <DialogTitle className="text-white">Record Vaccination</DialogTitle>
+                              <DialogDescription className="text-slate-400">
+                                Add a new vaccination record for a flock.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 pt-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label className="text-slate-300">Flock</Label>
+                                  <Select value={newVaccination.flockId} onValueChange={(value) => setNewVaccination({ ...newVaccination, flockId: value })}>
+                                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                                      <SelectValue placeholder="Select flock" />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-slate-700 border-slate-600">
+                                      {flocks.map((flock) => (
+                                        <SelectItem key={flock.id} value={flock.id} className="text-white">
+                                          {flock.batchNumber}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div>
+                                  <Label className="text-slate-300">Vaccine/Medicine</Label>
+                                  <Select value={newVaccination.medicineId} onValueChange={(value) => setNewVaccination({ ...newVaccination, medicineId: value })}>
+                                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                                      <SelectValue placeholder="Select vaccine" />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-slate-700 border-slate-600">
+                                      {medicines.filter(m => m.type === "VACCINE").map((med) => (
+                                        <SelectItem key={med.id} value={med.id} className="text-white">
+                                          {med.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label className="text-slate-300">Date</Label>
+                                  <Input
+                                    type="date"
+                                    value={newVaccination.vaccinationDate}
+                                    onChange={(e) => setNewVaccination({ ...newVaccination, vaccinationDate: e.target.value })}
+                                    className="bg-slate-700 border-slate-600 text-white"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-slate-300">Dosage</Label>
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    value={newVaccination.dosage}
+                                    onChange={(e) => setNewVaccination({ ...newVaccination, dosage: parseFloat(e.target.value) || 0 })}
+                                    className="bg-slate-700 border-slate-600 text-white"
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <Label className="text-slate-300">Administered By</Label>
+                                <Input
+                                  placeholder="Veterinarian name"
+                                  value={newVaccination.administeredBy}
+                                  onChange={(e) => setNewVaccination({ ...newVaccination, administeredBy: e.target.value })}
+                                  className="bg-slate-700 border-slate-600 text-white"
+                                />
+                              </div>
+                              <Button onClick={createVaccination} className="w-full bg-gradient-to-r from-purple-600 to-pink-600">
+                                Record Vaccination
+                              </Button>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
 
-                        <Button
-                          variant="outline"
-                          className="h-20 flex-col gap-2 border-slate-600 hover:bg-slate-700 hover:border-cyan-500"
-                        >
-                          <Wallet className="w-5 h-5 text-cyan-500" />
-                          <span className="text-slate-300">Add Transaction</span>
-                        </Button>
+                        <Dialog open={showTransactionDialog} onOpenChange={setShowTransactionDialog}>
+                          <DialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="h-20 flex-col gap-2 border-slate-600 hover:bg-slate-700 hover:border-cyan-500"
+                            >
+                              <Wallet className="w-5 h-5 text-cyan-500" />
+                              <span className="text-slate-300">Add Transaction</span>
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="bg-slate-800 border-slate-700">
+                            <DialogHeader>
+                              <DialogTitle className="text-white">Record Transaction</DialogTitle>
+                              <DialogDescription className="text-slate-400">
+                                Add an income or expense record.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 pt-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label className="text-slate-300">Type</Label>
+                                  <Select value={newTransaction.type} onValueChange={(value) => setNewTransaction({ ...newTransaction, type: value })}>
+                                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-slate-700 border-slate-600">
+                                      <SelectItem value="INCOME" className="text-white">Income</SelectItem>
+                                      <SelectItem value="EXPENSE" className="text-white">Expense</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div>
+                                  <Label className="text-slate-300">Category</Label>
+                                  <Select value={newTransaction.category} onValueChange={(value) => setNewTransaction({ ...newTransaction, category: value })}>
+                                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                                      <SelectValue placeholder="Select category" />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-slate-700 border-slate-600">
+                                      {newTransaction.type === "INCOME" ? (
+                                        <>
+                                          <SelectItem value="Bird Sales" className="text-white">Bird Sales</SelectItem>
+                                          <SelectItem value="Manure Sales" className="text-white">Manure Sales</SelectItem>
+                                          <SelectItem value="Other" className="text-white">Other</SelectItem>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <SelectItem value="Feed" className="text-white">Feed</SelectItem>
+                                          <SelectItem value="Medicine" className="text-white">Medicine</SelectItem>
+                                          <SelectItem value="Labor" className="text-white">Labor</SelectItem>
+                                          <SelectItem value="Utilities" className="text-white">Utilities</SelectItem>
+                                          <SelectItem value="Equipment" className="text-white">Equipment</SelectItem>
+                                        </>
+                                      )}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label className="text-slate-300">Amount ($)</Label>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    value={newTransaction.amount}
+                                    onChange={(e) => setNewTransaction({ ...newTransaction, amount: parseFloat(e.target.value) || 0 })}
+                                    className="bg-slate-700 border-slate-600 text-white"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-slate-300">Date</Label>
+                                  <Input
+                                    type="date"
+                                    value={newTransaction.date}
+                                    onChange={(e) => setNewTransaction({ ...newTransaction, date: e.target.value })}
+                                    className="bg-slate-700 border-slate-600 text-white"
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <Label className="text-slate-300">Description</Label>
+                                <Textarea
+                                  placeholder="Transaction details..."
+                                  value={newTransaction.description}
+                                  onChange={(e) => setNewTransaction({ ...newTransaction, description: e.target.value })}
+                                  className="bg-slate-700 border-slate-600 text-white"
+                                />
+                              </div>
+                              <Button onClick={createTransaction} className="w-full bg-gradient-to-r from-cyan-600 to-blue-600">
+                                Record Transaction
+                              </Button>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
                       </div>
                     </CardContent>
                   </Card>
