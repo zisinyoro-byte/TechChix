@@ -153,6 +153,7 @@ export default function TechChixDashboard() {
   const [showFeedDialog, setShowFeedDialog] = useState(false)
   const [showVaccinationDialog, setShowVaccinationDialog] = useState(false)
   const [showTransactionDialog, setShowTransactionDialog] = useState(false)
+  const [showAddFeedDialog, setShowAddFeedDialog] = useState(false)
   const { toast } = useToast()
 
   // Form states
@@ -201,6 +202,14 @@ export default function TechChixDashboard() {
     date: new Date().toISOString().split("T")[0],
     description: "",
     flockId: "",
+  })
+
+  const [newFeed, setNewFeed] = useState({
+    name: "",
+    type: "STARTER",
+    quantity: 0,
+    unitCost: 0,
+    reorderLevel: 50,
   })
 
   // Fetch dashboard data
@@ -451,6 +460,38 @@ export default function TechChixDashboard() {
       toast({
         title: "Error",
         description: "Failed to record transaction",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Create new feed type
+  const createFeed = async () => {
+    try {
+      const res = await fetch("/api/feed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newFeed),
+      })
+      if (!res.ok) throw new Error("Failed to create")
+      toast({
+        title: "Success",
+        description: "Feed type added successfully",
+      })
+      setShowAddFeedDialog(false)
+      setNewFeed({
+        name: "",
+        type: "STARTER",
+        quantity: 0,
+        unitCost: 0,
+        reorderLevel: 50,
+      })
+      fetchFeeds()
+      fetchDashboard()
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add feed type",
         variant: "destructive",
       })
     }
@@ -1510,15 +1551,106 @@ export default function TechChixDashboard() {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-white">Feed Inventory</CardTitle>
-                      <Button className="bg-gradient-to-r from-emerald-600 to-cyan-600">
-                        <Plus className="w-4 h-4 mr-2" /> Add Feed
-                      </Button>
+                      <Dialog open={showAddFeedDialog} onOpenChange={setShowAddFeedDialog}>
+                        <DialogTrigger asChild>
+                          <Button className="bg-gradient-to-r from-emerald-600 to-cyan-600">
+                            <Plus className="w-4 h-4 mr-2" /> Add Feed
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="bg-slate-800 border-slate-700">
+                          <DialogHeader>
+                            <DialogTitle className="text-white">Add New Feed Type</DialogTitle>
+                            <DialogDescription className="text-slate-400">
+                              Add a new feed type to your inventory.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4 pt-4">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <Label className="text-slate-300">Feed Name</Label>
+                                <Input
+                                  placeholder="Broiler Starter"
+                                  value={newFeed.name}
+                                  onChange={(e) => setNewFeed({ ...newFeed, name: e.target.value })}
+                                  className="bg-slate-700 border-slate-600 text-white"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-slate-300">Feed Type</Label>
+                                <Select value={newFeed.type} onValueChange={(value) => setNewFeed({ ...newFeed, type: value })}>
+                                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent className="bg-slate-700 border-slate-600">
+                                    <SelectItem value="STARTER" className="text-white">Starter</SelectItem>
+                                    <SelectItem value="GROWER" className="text-white">Grower</SelectItem>
+                                    <SelectItem value="FINISHER" className="text-white">Finisher</SelectItem>
+                                    <SelectItem value="PRE_STARTER" className="text-white">Pre-Starter</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <Label className="text-slate-300">Initial Quantity (kg)</Label>
+                                <Input
+                                  type="number"
+                                  value={newFeed.quantity}
+                                  onChange={(e) => setNewFeed({ ...newFeed, quantity: parseFloat(e.target.value) || 0 })}
+                                  className="bg-slate-700 border-slate-600 text-white"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-slate-300">Unit Cost ($)</Label>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  value={newFeed.unitCost}
+                                  onChange={(e) => setNewFeed({ ...newFeed, unitCost: parseFloat(e.target.value) || 0 })}
+                                  className="bg-slate-700 border-slate-600 text-white"
+                                />
+                              </div>
+                            </div>
+                            <Button onClick={createFeed} className="w-full bg-gradient-to-r from-emerald-600 to-cyan-600">
+                              Add Feed Type
+                            </Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-slate-400 text-center py-8">
-                      Feed inventory management will be displayed here
-                    </p>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-slate-700">
+                            <th className="text-left py-3 px-4 text-slate-400">Name</th>
+                            <th className="text-left py-3 px-4 text-slate-400">Type</th>
+                            <th className="text-left py-3 px-4 text-slate-400">Quantity</th>
+                            <th className="text-left py-3 px-4 text-slate-400">Unit Cost</th>
+                            <th className="text-left py-3 px-4 text-slate-400">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {feeds.map((feed) => (
+                            <tr key={feed.id} className="border-b border-slate-700/50">
+                              <td className="py-3 px-4 text-white font-medium">{feed.name}</td>
+                              <td className="py-3 px-4 text-slate-300">{feed.type}</td>
+                              <td className="py-3 px-4 text-slate-300">{feed.quantity} kg</td>
+                              <td className="py-3 px-4 text-slate-300">${feed.unitCost}/kg</td>
+                              <td className="py-3 px-4">
+                                <Badge className={feed.quantity <= 50 ? "bg-red-600" : "bg-emerald-600"}>
+                                  {feed.quantity <= 50 ? "Low Stock" : "In Stock"}
+                                </Badge>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {feeds.length === 0 && (
+                        <p className="text-slate-400 text-center py-8">No feed types added yet</p>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -1542,9 +1674,88 @@ export default function TechChixDashboard() {
                       <CardHeader>
                         <div className="flex items-center justify-between">
                           <CardTitle className="text-white">Vaccination Schedule</CardTitle>
-                          <Button className="bg-gradient-to-r from-emerald-600 to-cyan-600">
-                            <Plus className="w-4 h-4 mr-2" /> Add Vaccination
-                          </Button>
+                          <Dialog open={showVaccinationDialog} onOpenChange={setShowVaccinationDialog}>
+                            <DialogTrigger asChild>
+                              <Button className="bg-gradient-to-r from-emerald-600 to-cyan-600">
+                                <Plus className="w-4 h-4 mr-2" /> Add Vaccination
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="bg-slate-800 border-slate-700">
+                              <DialogHeader>
+                                <DialogTitle className="text-white">Record Vaccination</DialogTitle>
+                                <DialogDescription className="text-slate-400">
+                                  Add a new vaccination record for a flock.
+                                </DialogDescription>
+                              </DialogHeader>
+                              <div className="space-y-4 pt-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <Label className="text-slate-300">Flock</Label>
+                                    <Select value={newVaccination.flockId} onValueChange={(value) => setNewVaccination({ ...newVaccination, flockId: value })}>
+                                      <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                                        <SelectValue placeholder="Select flock" />
+                                      </SelectTrigger>
+                                      <SelectContent className="bg-slate-700 border-slate-600">
+                                        {flocks.map((flock) => (
+                                          <SelectItem key={flock.id} value={flock.id} className="text-white">
+                                            {flock.batchNumber}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div>
+                                    <Label className="text-slate-300">Vaccine/Medicine</Label>
+                                    <Select value={newVaccination.medicineId} onValueChange={(value) => setNewVaccination({ ...newVaccination, medicineId: value })}>
+                                      <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                                        <SelectValue placeholder="Select vaccine" />
+                                      </SelectTrigger>
+                                      <SelectContent className="bg-slate-700 border-slate-600">
+                                        {medicines.filter(m => m.type === "VACCINE").map((med) => (
+                                          <SelectItem key={med.id} value={med.id} className="text-white">
+                                            {med.name}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <Label className="text-slate-300">Date</Label>
+                                    <Input
+                                      type="date"
+                                      value={newVaccination.vaccinationDate}
+                                      onChange={(e) => setNewVaccination({ ...newVaccination, vaccinationDate: e.target.value })}
+                                      className="bg-slate-700 border-slate-600 text-white"
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label className="text-slate-300">Dosage</Label>
+                                    <Input
+                                      type="number"
+                                      step="0.1"
+                                      value={newVaccination.dosage}
+                                      onChange={(e) => setNewVaccination({ ...newVaccination, dosage: parseFloat(e.target.value) || 0 })}
+                                      className="bg-slate-700 border-slate-600 text-white"
+                                    />
+                                  </div>
+                                </div>
+                                <div>
+                                  <Label className="text-slate-300">Administered By</Label>
+                                  <Input
+                                    placeholder="Veterinarian name"
+                                    value={newVaccination.administeredBy}
+                                    onChange={(e) => setNewVaccination({ ...newVaccination, administeredBy: e.target.value })}
+                                    className="bg-slate-700 border-slate-600 text-white"
+                                  />
+                                </div>
+                                <Button onClick={createVaccination} className="w-full bg-gradient-to-r from-purple-600 to-pink-600">
+                                  Record Vaccination
+                                </Button>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
                         </div>
                       </CardHeader>
                       <CardContent>
@@ -1646,9 +1857,95 @@ export default function TechChixDashboard() {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-white">Recent Transactions</CardTitle>
-                      <Button className="bg-gradient-to-r from-emerald-600 to-cyan-600">
-                        <Plus className="w-4 h-4 mr-2" /> Add Transaction
-                      </Button>
+                      <Dialog open={showTransactionDialog} onOpenChange={setShowTransactionDialog}>
+                        <DialogTrigger asChild>
+                          <Button className="bg-gradient-to-r from-emerald-600 to-cyan-600">
+                            <Plus className="w-4 h-4 mr-2" /> Add Transaction
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="bg-slate-800 border-slate-700">
+                          <DialogHeader>
+                            <DialogTitle className="text-white">Record Transaction</DialogTitle>
+                            <DialogDescription className="text-slate-400">
+                              Add an income or expense record.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4 pt-4">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <Label className="text-slate-300">Type</Label>
+                                <Select value={newTransaction.type} onValueChange={(value) => setNewTransaction({ ...newTransaction, type: value })}>
+                                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent className="bg-slate-700 border-slate-600">
+                                    <SelectItem value="INCOME" className="text-white">Income</SelectItem>
+                                    <SelectItem value="EXPENSE" className="text-white">Expense</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div>
+                                <Label className="text-slate-300">Category</Label>
+                                <Select value={newTransaction.category} onValueChange={(value) => setNewTransaction({ ...newTransaction, category: value })}>
+                                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                                    <SelectValue placeholder="Select category" />
+                                  </SelectTrigger>
+                                  <SelectContent className="bg-slate-700 border-slate-600">
+                                    {newTransaction.type === "INCOME" ? (
+                                      <>
+                                        <SelectItem value="Bird Sales" className="text-white">Bird Sales</SelectItem>
+                                        <SelectItem value="Manure Sales" className="text-white">Manure Sales</SelectItem>
+                                        <SelectItem value="Other" className="text-white">Other</SelectItem>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <SelectItem value="Feed" className="text-white">Feed</SelectItem>
+                                        <SelectItem value="Medicine" className="text-white">Medicine</SelectItem>
+                                        <SelectItem value="Labor" className="text-white">Labor</SelectItem>
+                                        <SelectItem value="Utilities" className="text-white">Utilities</SelectItem>
+                                        <SelectItem value="Equipment" className="text-white">Equipment</SelectItem>
+                                      </>
+                                    )}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <Label className="text-slate-300">Amount ($)</Label>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  value={newTransaction.amount}
+                                  onChange={(e) => setNewTransaction({ ...newTransaction, amount: parseFloat(e.target.value) || 0 })}
+                                  className="bg-slate-700 border-slate-600 text-white"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-slate-300">Date</Label>
+                                <Input
+                                  type="date"
+                                  value={newTransaction.date}
+                                  onChange={(e) => setNewTransaction({ ...newTransaction, date: e.target.value })}
+                                  className="bg-slate-700 border-slate-600 text-white"
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <Label className="text-slate-300">Description</Label>
+                              <Textarea
+                                placeholder="Transaction details..."
+                                value={newTransaction.description}
+                                onChange={(e) => setNewTransaction({ ...newTransaction, description: e.target.value })}
+                                className="bg-slate-700 border-slate-600 text-white"
+                              />
+                            </div>
+                            <Button onClick={createTransaction} className="w-full bg-gradient-to-r from-cyan-600 to-blue-600">
+                              Record Transaction
+                            </Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
                     </div>
                   </CardHeader>
                   <CardContent>
