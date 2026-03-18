@@ -1,0 +1,327 @@
+// TechChix - Broiler Management System Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Farm Management
+model Farm {
+  id          String   @id @default(cuid())
+  name        String
+  location    String?
+  capacity    Int      @default(0)
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  houses      House[]
+}
+
+model House {
+  id          String   @id @default(cuid())
+  name        String
+  capacity    Int      @default(0)
+  farmId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  farm        Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  flocks      Flock[]
+  environment EnvironmentReading[]
+  
+  @@index([farmId])
+}
+
+// Flock Management
+model Flock {
+  id           String      @id @default(cuid())
+  batchNumber  String      @unique
+  breed        String
+  startDate    DateTime
+  endDate      DateTime?
+  initialCount Int
+  currentCount Int
+  status       FlockStatus @default(ACTIVE)
+  houseId      String
+  notes        String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  
+  house        House       @relation(fields: [houseId], references: [id], onDelete: Cascade)
+  dailyRecords DailyRecord[]
+  vaccinations Vaccination[]
+  mortalities  Mortality[]
+  feedRecords  FeedDistribution[]
+  finances     Financial[]
+  
+  @@index([houseId])
+  @@index([status])
+}
+
+model DailyRecord {
+  id             String   @id @default(cuid())
+  date           DateTime
+  flockId        String
+  mortality      Int      @default(0)
+  culled         Int      @default(0)
+  feedConsumed   Float    @default(0) // kg
+  waterConsumed  Float    @default(0) // liters
+  avgWeight      Float?   // kg
+  temperature    Float?   // celsius
+  humidity       Float?    // percentage
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  flock          Flock    @relation(fields: [flockId], references: [id], onDelete: Cascade)
+  
+  @@unique([flockId, date])
+  @@index([flockId])
+  @@index([date])
+}
+
+// Feed Management
+model Feed {
+  id           String           @id @default(cuid())
+  name         String
+  type         FeedType
+  quantity     Float            @default(0) // kg
+  unitCost     Float            @default(0)
+  reorderLevel Float            @default(50)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  
+  purchases    FeedPurchase[]
+  distributions FeedDistribution[]
+}
+
+model FeedPurchase {
+  id          String   @id @default(cuid())
+  feedId      String
+  quantity    Float    // kg
+  unitCost    Float
+  totalCost   Float
+  purchaseDate DateTime
+  supplier    String?
+  invoiceNo   String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  
+  feed        Feed     @relation(fields: [feedId], references: [id], onDelete: Cascade)
+  
+  @@index([feedId])
+  @@index([purchaseDate])
+}
+
+model FeedDistribution {
+  id             String   @id @default(cuid())
+  feedId         String
+  flockId        String
+  quantity       Float    // kg
+  distributedAt  DateTime
+  distributedBy  String?
+  notes          String?
+  createdAt      DateTime @default(now())
+  
+  feed           Feed     @relation(fields: [feedId], references: [id], onDelete: Cascade)
+  flock          Flock    @relation(fields: [flockId], references: [id], onDelete: Cascade)
+  
+  @@index([feedId])
+  @@index([flockId])
+  @@index([distributedAt])
+}
+
+// Health Management
+model Medicine {
+  id           String        @id @default(cuid())
+  name         String
+  type         MedicineType
+  quantity     Float         @default(0)
+  unit         String        @default("units")
+  unitCost     Float         @default(0)
+  expiryDate   DateTime?
+  reorderLevel Float         @default(10)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  
+  vaccinations  Vaccination[]
+  treatments    Treatment[]
+  
+  @@index([type])
+}
+
+model Vaccination {
+  id            String      @id @default(cuid())
+  flockId       String
+  medicineId    String
+  vaccinationDate DateTime
+  dosage        Float
+  administeredBy String?
+  method        String?
+  notes         String?
+  nextDueDate   DateTime?
+  createdAt     DateTime    @default(now())
+  
+  flock         Flock       @relation(fields: [flockId], references: [id], onDelete: Cascade)
+  medicine      Medicine    @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+  
+  @@index([flockId])
+  @@index([vaccinationDate])
+}
+
+model Treatment {
+  id            String   @id @default(cuid())
+  flockId       String
+  medicineId    String
+  treatmentDate DateTime
+  dosage        Float
+  duration      Int?     // days
+  administeredBy String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  
+  medicine      Medicine @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+  
+  @@index([flockId])
+  @@index([treatmentDate])
+}
+
+model Mortality {
+  id          String        @id @default(cuid())
+  flockId     String
+  date        DateTime
+  count       Int
+  cause       MortalityCause
+  description String?
+  notes       String?
+  createdAt   DateTime      @default(now())
+  
+  flock       Flock         @relation(fields: [flockId], references: [id], onDelete: Cascade)
+  
+  @@index([flockId])
+  @@index([date])
+}
+
+// Financial Management
+model Financial {
+  id          String          @id @default(cuid())
+  type        TransactionType
+  category    String
+  amount      Float
+  date        DateTime
+  description String?
+  flockId     String?
+  referenceNo String?
+  createdAt   DateTime        @default(now())
+  
+  flock       Flock?          @relation(fields: [flockId], references: [id], onDelete: SetNull)
+  
+  @@index([type])
+  @@index([category])
+  @@index([date])
+}
+
+// Environment Monitoring
+model EnvironmentReading {
+  id          String   @id @default(cuid())
+  houseId     String
+  temperature Float?   // celsius
+  humidity    Float?    // percentage
+  co2         Float?    // ppm
+  ammonia     Float?    // ppm
+  light       Float?    // lux
+  timestamp   DateTime  @default(now())
+  source      String    @default("manual") // manual, sensor
+  
+  house       House     @relation(fields: [houseId], references: [id], onDelete: Cascade)
+  
+  @@index([houseId])
+  @@index([timestamp])
+}
+
+model AlertThreshold {
+  id           String   @id @default(cuid())
+  houseId      String?
+  parameter    String   // temperature, humidity, co2, ammonia
+  minValue     Float?
+  maxValue     Float?
+  isEnabled    Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Alert {
+  id          String      @id @default(cuid())
+  type        AlertType
+  title       String
+  message     String
+  priority    AlertPriority
+  isRead      Boolean     @default(false)
+  houseId     String?
+  flockId     String?
+  createdAt   DateTime    @default(now())
+  
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+// Enums
+enum FlockStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum FeedType {
+  STARTER
+  GROWER
+  FINISHER
+  PRE_STARTER
+  CONCENTRATE
+}
+
+enum MedicineType {
+  VACCINE
+  ANTIBIOTIC
+  VITAMIN
+  ANTIPARASITIC
+  DISINFECTANT
+  OTHER
+}
+
+enum MortalityCause {
+  DISEASE
+  HEAT_STRESS
+  COLD_STRESS
+  INJURY
+  PREDATION
+  UNKNOWN
+  OTHER
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum AlertType {
+  MORTALITY
+  FEED_LOW
+  ENVIRONMENT
+  VACCINATION
+  FINANCIAL
+  SYSTEM
+}
+
+enum AlertPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
